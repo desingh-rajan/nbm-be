@@ -2,6 +2,9 @@
 service: nbm-be
 image: desinghrajan/nbm-be
 
+# Primary domain (same as frontend)
+primary_role: web
+
 # Docker registry authentication
 registry:
   username: desinghrajan
@@ -13,14 +16,6 @@ servers:
   web:
     hosts:
       - 139.84.158.2
-    labels:
-      traefik.http.routers.nbm-be-api.rule: Host(`neverbeforemarketing.com`) && PathPrefix(`/nbm-be/api`)
-      traefik.http.routers.nbm-be-api.entrypoints: websecure
-      traefik.http.routers.nbm-be-api.tls: true
-      traefik.http.routers.nbm-be-api.tls.certresolver: letsencrypt
-      traefik.http.middlewares.nbm-be-strip.stripprefix.prefixes: /nbm-be/api
-      traefik.http.routers.nbm-be-api.middlewares: nbm-be-strip
-      traefik.http.services.nbm-be-api.loadbalancer.server.port: 8000
 
 # PostgreSQL database accessory
 accessories:
@@ -65,10 +60,18 @@ env:
 ssh:
   user: root
 
-# Use existing Traefik proxy from frontend (don't create a new one)
+# Use existing kamal-proxy from frontend deployment
+# Note: Path-based routing must be manually configured after deployment
+# Run: kamal app exec -i "docker exec kamal-proxy kamal-proxy deploy nbm-be-web --target=\$(docker ps -q -f name=nbm-be-web):8000 --host=neverbeforemarketing.com --path-prefix=/nbm-be/api --strip-path-prefix=true --health-check-path=/health --health-check-interval=10s --health-check-timeout=120s"
 proxy:
-  host: 139.84.158.2
+  host: neverbeforemarketing.com
+  ssl: false
   app_port: 8000
+  forward_headers: true
+  response_timeout: 60
+  buffering:
+    requests: true
+    responses: true
   healthcheck:
     path: /health
     timeout: 120

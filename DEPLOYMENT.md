@@ -36,41 +36,49 @@ source .kamal/secrets
 ### First Time Setup
 
 1. **Initialize Kamal** (if not done):
+
    ```bash
    kamal init
    ```
 
 2. **Setup the server** (installs Docker, creates network):
+
    ```bash
    kamal server bootstrap
    ```
 
 3. **Setup PostgreSQL accessory**:
+
    ```bash
    kamal accessory boot postgres
    ```
-   
+
    Wait for PostgreSQL to be ready:
+
    ```bash
    kamal accessory logs postgres
    ```
 
 4. **Build and push the Docker image**:
+
    ```bash
    kamal build push
    ```
 
 5. **Deploy the application**:
+
    ```bash
    kamal deploy
    ```
 
 6. **Run database migrations**:
+
    ```bash
    kamal app exec 'deno run --allow-all scripts/migrate-run.ts'
    ```
 
 7. **Seed the superadmin user** (only once):
+
    ```bash
    kamal app exec 'deno run --allow-all scripts/seed-superadmin.ts'
    ```
@@ -91,6 +99,7 @@ kamal deploy
 ## Useful Commands
 
 ### Check Status
+
 ```bash
 # Check all services
 kamal app status
@@ -167,6 +176,7 @@ The deployment is configured to work with your existing Traefik instance from th
 ## Database Connection
 
 The application connects to PostgreSQL using:
+
 - **Host**: `nbm-be-postgres` (Docker network internal DNS)
 - **Port**: `5432`
 - **Database**: `nbm_be_production`
@@ -186,6 +196,7 @@ The application connects to PostgreSQL using:
 The application uses these environment variables in production:
 
 **Clear (not secret):**
+
 - `PORT=8000`
 - `NODE_ENV=production`
 - `ENVIRONMENT=production`
@@ -195,6 +206,7 @@ The application uses these environment variables in production:
 - `DATABASE_USER=nbm_user`
 
 **Secret:**
+
 - `DATABASE_PASSWORD` - PostgreSQL password
 - `JWT_SECRET` - JWT signing key
 
