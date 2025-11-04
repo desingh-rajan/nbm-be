@@ -1,0 +1,89 @@
+# Kamal Configuration for NBM Backend API
+service: nbm-be
+image: desinghrajan/nbm-be
+
+# Docker registry authentication
+registry:
+  username: desinghrajan
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+# Servers to deploy to
+servers:
+  web:
+    hosts:
+      - 139.84.158.2
+    labels:
+      traefik.http.routers.nbm-be.rule: Host(`neverbeforemarketing.com`) && PathPrefix(`/nbm-be/api`)
+      traefik.http.routers.nbm-be.entrypoints: websecure
+      traefik.http.routers.nbm-be.tls: true
+      traefik.http.routers.nbm-be.tls.certresolver: letsencrypt
+      traefik.http.middlewares.nbm-be-strip.stripprefix.prefixes: /nbm-be/api
+      traefik.http.routers.nbm-be.middlewares: nbm-be-strip
+
+# PostgreSQL database accessory
+accessories:
+  postgres:
+    image: postgres:16-alpine
+    host: 139.84.158.2
+    port: 5432
+    env:
+      clear:
+        POSTGRES_USER: nbm_user
+        POSTGRES_DB: nbm_be_production
+      secret:
+        - POSTGRES_PASSWORD
+    directories:
+      - data:/var/lib/postgresql/data
+    options:
+      health-cmd: "pg_isready -U nbm_user"
+      health-interval: 10s
+      health-timeout: 5s
+      health-retries: 5
+
+# Environment variables for the application
+env:
+  clear:
+    PORT: 8000
+    NODE_ENV: production
+    ENVIRONMENT: production
+    DATABASE_HOST: nbm-be-postgres
+    DATABASE_PORT: 5432
+    DATABASE_NAME: nbm_be_production
+    DATABASE_USER: nbm_user
+  secret:
+    - DATABASE_PASSWORD
+    - JWT_SECRET
+
+# SSH configuration
+ssh:
+  user: root
+
+# Health check endpoint
+healthcheck:
+  path: /health
+  port: 8000
+  max_attempts: 7
+  interval: 10s
+
+# Traefik proxy (already running from frontend deployment)
+proxy:
+  host: 139.84.158.2
+
+# Build configuration
+builder:
+  arch: amd64
+  cache:
+    type: registry
+    options: mode=max
+
+# Asset path (not needed for API, but good to have)
+# asset_path: /app/public
+
+# Volumes (if needed for logs or uploads)
+# volumes:
+#   - "./storage:/app/storage"
+
+# Run migrations after deployment
+# Will be executed using kamal app exec
+# Example: kamal app exec 'deno run --allow-all scripts/migrate-run.ts'

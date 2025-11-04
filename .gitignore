@@ -33,3 +33,7 @@ coverage/
 # Distribution
 dist/
 build/
+
+# Kamal
+.kamal/secrets
+.kamal/secrets-*
