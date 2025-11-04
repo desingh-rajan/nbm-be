@@ -1,0 +1,56 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-all --watch src/main.ts",
+    "start": "deno run --allow-all src/main.ts",
+    "db:create": "deno run --allow-env --allow-net --allow-read scripts/create-db.ts",
+    "db:seed": "deno run --allow-all scripts/seed-superadmin.ts && deno run --allow-all scripts/seed-alpha-user.ts",
+    "db:seed:superadmin": "deno run --allow-all scripts/seed-superadmin.ts",
+    "db:seed:alpha": "deno run --allow-all scripts/seed-alpha-user.ts",
+    "env:validate": "deno run --allow-env scripts/validate-env.ts",
+    "setup": "deno task env:validate && deno task migrate:run && deno task db:seed",
+    "migrate:generate": "deno run --allow-all scripts/migrate-generate.ts",
+    "migrate:run": "deno run --allow-all scripts/migrate-run.ts",
+    "db:studio": "deno run --allow-all scripts/db-studio.ts",
+    "test": "ENVIRONMENT=test deno test --allow-all src/",
+    "test:setup": "ENVIRONMENT=test deno run --allow-all scripts/setup-test-db.ts",
+    "test:migrate": "ENVIRONMENT=test deno task migrate:run",
+    "test:seed": "ENVIRONMENT=test deno task db:seed",
+    "test:reset": "deno task test:setup && deno task test:migrate && deno task test:seed",
+    "test:full": "deno run --allow-all scripts/setup-test-full.ts && echo '🚀 Running tests...' && deno task test && echo '✅ All tests completed!'",
+    "test:watch": "ENVIRONMENT=test deno test --allow-all --watch src/",
+    "test:coverage": "ENVIRONMENT=test deno test --allow-all --coverage=coverage src/",
+    "test:check": "deno run --allow-all scripts/test-health-check.ts",
+    "fmt": "deno fmt",
+    "lint": "deno lint"
+  },
+  "imports": {
+    "@std/": "jsr:@std/",
+    "@std/dotenv/load": "jsr:@std/dotenv@^0.225.0/load",
+    "@std/dotenv": "jsr:@std/dotenv@^0.225.0",
+    "jose": "npm:jose@^5.9.6",
+    "hono": "jsr:@hono/hono@^4.6.0",
+    "hono/cors": "jsr:@hono/hono@^4.6.0/cors",
+    "hono/logger": "jsr:@hono/hono@^4.6.0/logger",
+    "hono/jwt": "jsr:@hono/hono@^4.6.0/jwt",
+    "drizzle-orm": "npm:drizzle-orm@^0.36.0",
+    "drizzle-orm/pg-core": "npm:drizzle-orm@^0.36.0/pg-core",
+    "drizzle-orm/postgres-js": "npm:drizzle-orm@^0.36.0/postgres-js",
+    "drizzle-kit": "npm:drizzle-kit@^0.28.0",
+    "drizzle-zod": "npm:drizzle-zod@^0.5.0",
+    "postgres": "npm:postgres@^3.4.0",
+    "zod": "npm:zod@^3.23.0"
+  },
+  "fmt": {
+    "semiColons": true,
+    "singleQuote": false
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "strict": true
+  }
+}
