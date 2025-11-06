@@ -60,25 +60,22 @@ env:
 ssh:
   user: root
 
-# Use existing kamal-proxy from frontend deployment
-# Path-based routing: /nbm-be/api/* routes to this backend (proxy strips prefix)
-# App routes are registered at root: /site-settings, /articles, /auth/*, etc.
-# Proxy forwards: /nbm-be/api/site-settings → /site-settings (strips prefix by default)
+# Proxy configuration for path-based routing
+# Routes /nbm-be/api/* to this service (strips prefix by default)
 proxy:
   host: neverbeforemarketing.com
+  path_prefix: /nbm-be/api
   ssl: false
   app_port: 8000
   forward_headers: true
   response_timeout: 60
+  healthcheck:
+    path: /health
+    interval: 10
+    timeout: 120
   buffering:
     requests: true
     responses: true
-  healthcheck:
-    path: /health
-    timeout: 120
-    interval: 10
-  deploy:
-    path: /nbm-be/api
 
 # Build configuration
 builder:
@@ -86,14 +83,3 @@ builder:
   cache:
     type: registry
     options: mode=max
-
-# Asset path (not needed for API, but good to have)
-# asset_path: /app/public
-
-# Volumes (if needed for logs or uploads)
-# volumes:
-#   - "./storage:/app/storage"
-
-# Run migrations after deployment
-# Will be executed using kamal app exec
-# Example: kamal app exec 'deno run --allow-all scripts/migrate-run.ts'
