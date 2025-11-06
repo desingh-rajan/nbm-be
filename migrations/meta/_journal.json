@@ -8,6 +8,13 @@
       "when": 1762217741259,
       "tag": "0000_outgoing_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1762383487581,
+      "tag": "0001_young_mephistopheles",
+      "breakpoints": true
     }
   ]
 }

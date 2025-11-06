@@ -165,9 +165,25 @@ export const products = pgTable("products", {
 Generate and run migrations:
 
 ```bash
+# Generate migration with descriptive name (recommended)
+deno task migrate:generate -- --name "add_products_table"
+# Result: migrations/0001_add_products_table.sql
+
+# Or generate without name (random name)
 deno task migrate:generate
+# Result: migrations/0001_random_superhero_name.sql
+
+# Run migrations
 deno task migrate:run
 ```
+
+**Migration Naming Convention:**
+Always use `--name` flag with descriptive names for better clarity:
+
+- `add_[table]_table` - Creating new table
+- `add_[field]_to_[table]` - Adding column
+- `remove_[field]_from_[table]` - Removing column
+- `update_[table]_[change]` - Modifying table structure
 
 Register routes in `main.ts`:
 
@@ -331,9 +347,60 @@ docker run -d \
 
 ---
 
+## Database Migrations
+
+### Creating Migrations
+
+Always use descriptive names for migrations to maintain clarity:
+
+```bash
+# Good practice - descriptive names
+deno task migrate:generate -- --name "create_site_settings"
+deno task migrate:generate -- --name "add_avatar_to_users"
+deno task migrate:generate -- --name "add_published_at_to_articles"
+
+# Avoid - random names (harder to track)
+deno task migrate:generate  # Results in: 0001_random_superhero_name.sql
+```
+
+### Naming Conventions
+
+Follow these patterns for consistency:
+
+| Pattern | Example | Use Case |
+|---------|---------|----------|
+| `create_[table]` | `create_site_settings` | New table |
+| `add_[field]_to_[table]` | `add_avatar_to_users` | Add column |
+| `remove_[field]_from_[table]` | `remove_phone_from_users` | Remove column |
+| `add_[index]_index` | `add_email_index` | Add index |
+| `update_[table]_[change]` | `update_users_constraints` | Modify structure |
+
+### Running Migrations
+
+```bash
+# Development
+deno task migrate:run
+
+# Test environment
+ENVIRONMENT=test deno task migrate:run
+
+# Production (via Kamal or direct)
+kamal app exec 'deno run --allow-all scripts/migrate-run.ts'
+```
+
+### Migration Workflow
+
+1. **Modify model** - Add fields to `*.model.ts`
+2. **Generate migration** - `deno task migrate:generate -- --name "descriptive_name"`
+3. **Review SQL** - Check `migrations/*.sql` file
+4. **Run migration** - `deno task migrate:run`
+5. **Test changes** - Verify in DB or Drizzle Studio
+
+---
+
 ## Testing
 
-### Quick Start
+### Quick Start Guide
 
 ```bash
 # Complete test setup + run (recommended)
