@@ -57,12 +57,7 @@ async function cleanupTestData() {
 // Helper function for making API requests - NO SERVER NEEDED!
 // Uses Hono's app.request() method directly
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
-  // Prepend /nbm-be/api to all endpoints
-  const fullEndpoint = endpoint.startsWith("/nbm-be/api")
-    ? endpoint
-    : `/nbm-be/api${endpoint}`;
-
-  const response = await app.request(fullEndpoint, {
+  const response = await app.request(endpoint, {
     ...options,
     headers: {
       "Content-Type": "application/json",

@@ -60,10 +60,7 @@ const updatedSiteSetting = {
 };
 
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
-  const fullEndpoint = endpoint.startsWith("/nbm-be/api")
-    ? endpoint
-    : `/nbm-be/api${endpoint}`;
-  const response = await app.request(fullEndpoint, {
+  const response = await app.request(endpoint, {
     ...options,
     headers: { "Content-Type": "application/json", ...options.headers },
   });

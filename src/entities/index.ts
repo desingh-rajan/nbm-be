@@ -13,7 +13,7 @@ import { Hono } from "hono";
  *   posts/
  *     post.route.ts (exports default Hono router)
  *
- * All routes will be automatically available under /api/*
+ * All routes will be automatically available under /*
  *
  * MANUAL OVERRIDE OPTIONS:
  *
@@ -22,8 +22,8 @@ import { Hono } from "hono";
  * // Comment out: await registerEntityRoutes(app);
  * import userRoutes from "./entities/users/user.route.ts";
  * import postRoutes from "./entities/posts/post.route.ts";
- * app.route("/api", userRoutes);
- * app.route("/api", postRoutes);
+ * app.route("/", userRoutes);
+ * app.route("/", postRoutes);
  * ```
  *
  * Option 2: Mix auto-discovery with manual routes
@@ -95,7 +95,7 @@ export async function registerEntityRoutes(app: Hono): Promise<void> {
             const routeModule = await import(`file://${routePath}`);
 
             if (routeModule.default) {
-              app.route("/nbm-be/api", routeModule.default);
+              app.route("/", routeModule.default);
               console.log(
                 `   [OK] Registered routes from ${entry.name}/${file.name}`,
               );

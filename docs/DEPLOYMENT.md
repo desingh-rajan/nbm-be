@@ -1,169 +1,143 @@
 # Deployment Guide
 
-## Kamal Deployment to Production
-
-### Production Environment
+## Production Environment
 
 - **Server**: Vultr VPS (139.84.158.2)
 - **Domain**: <https://neverbeforemarketing.com>
-- **API Path**: /nbm-be/api
-- **Deployment Tool**: Kamal 2.7.0
-- **Proxy**: kamal-proxy (shared with frontend)
+- **Tool**: Kamal 2.7.0
+- **API Base**: /nbm-be/api
 
-### Deployment Commands
+## Quick Deploy
 
 ```bash
-# Build and push Docker image
+# Deploy
 kamal deploy
-
-# Or skip build if already pushed
-kamal deploy --skip-push
 
 # Run migrations
 kamal app exec "deno task migrate:run"
 
 # Seed database
-kamal app exec "deno task db:seed"
 kamal app exec "deno task db:seed:site"
 
 # Check logs
-kamal app logs
-kamal app logs --since 5m
-
-# Restart app
-ssh root@139.84.158.2 "docker restart <container-name>"
+kamal app logs --since 10m
 ```
 
-### Automatic Proxy Registration (via Hooks)
+## How It Works
 
-Proxy registration is **automated** via the `post-deploy` hook in `config/deploy.yml`. After `kamal deploy` completes, the hook automatically:
+**Simplified Architecture:**
 
-1. Removes old proxy registration
-2. Gets the new container ID  
-3. Registers with kamal-proxy (with `--strip-path-prefix=false`)
-
-**No manual intervention needed for regular deployments!** ✅
-
-### Manual Proxy Registration (if needed)
-
-If the hook fails or you need to manually register:
-
-```bash
-# Register backend with path prefix (NO STRIPPING)
-ssh root@139.84.158.2 "docker exec kamal-proxy kamal-proxy deploy nbm-be-web \
-  --target=<container-id>:8000 \
-  --host=neverbeforemarketing.com \
-  --path-prefix=/nbm-be/api \
-  --strip-path-prefix=false \
-  --health-check-path=/health \
-  --health-check-interval=10s \
-  --health-check-timeout=120s \
-  --target-timeout=60s"
-
-# Check proxy routes
-ssh root@139.84.158.2 "docker exec kamal-proxy kamal-proxy list"
-
-# Remove proxy registration
-ssh root@139.84.158.2 "docker exec kamal-proxy kamal-proxy remove nbm-be-web"
+```
+Public URL:  https://neverbeforemarketing.com/nbm-be/api/site-settings
+               ↓
+Proxy:       Strips /nbm-be/api prefix (default behavior)
+               ↓
+App Route:   GET /site-settings
 ```
 
-### When Manual Registration is Required
+**Key Points:**
 
-You **only** need manual proxy registration in these scenarios:
+- App routes: `/site-settings`, `/articles`, `/auth/*` (no prefix in code!)
+- Public URLs: `https://neverbeforemarketing.com/nbm-be/api/*`
+- Proxy strips `/nbm-be/api` automatically (Kamal default)
+- Zero manual configuration needed ✨
 
-1. **First-time deployment** on a new VPS
-2. **Hook failure** (check deployment logs if proxy isn't working)
-3. **Proxy configuration change** (changing path prefix, host, etc.)
-
-For regular deployments, the hook handles everything automatically.
-
----
-
-## Common Issues
-
-### Issue 1: 404 Routes Not Found After Deployment
-
-**Symptoms:**
-
-- API returns 404 for all endpoints except `/health`
-- Container logs show: `GET /site-settings 404`
-- Routes are registered at `/nbm-be/api/*` in the code
-
-**Root Cause:**
-The `--strip-path-prefix` flag in kamal-proxy **defaults to `true`**. When enabled, the proxy strips `/nbm-be/api` from incoming requests before forwarding to the container. This causes a mismatch:
-
-- **Client request**: `https://neverbeforemarketing.com/nbm-be/api/site-settings`
-- **Proxy forwards** (with stripping): `/site-settings`
-- **App expects**: `/nbm-be/api/site-settings`
-- **Result**: 404 Not Found
-
-**Solution:**
-Explicitly set `--strip-path-prefix=false` when registering the proxy route:
+## Common Commands
 
 ```bash
-# WRONG (path prefix is stripped by default)
-docker exec kamal-proxy kamal-proxy deploy nbm-be-web \
-  --target=<container-id>:8000 \
-  --host=neverbeforemarketing.com \
-  --path-prefix=/nbm-be/api
+# Check container status
+ssh root@139.84.158.2 "docker ps | grep nbm-be"
 
-# CORRECT (preserve full path)
-docker exec kamal-proxy kamal-proxy deploy nbm-be-web \
-  --target=<container-id>:8000 \
-  --host=neverbeforemarketing.com \
-  --path-prefix=/nbm-be/api \
-  --strip-path-prefix=false  # ← ADD THIS
-```
-
-**Verification:**
-
-```bash
-# Test health endpoint
+# Test API
 curl https://neverbeforemarketing.com/nbm-be/api/health
-
-# Test API endpoint
 curl https://neverbeforemarketing.com/nbm-be/api/site-settings
 
-# Check container logs
-docker logs nbm-be-web-<hash>
+# Verify database
+ssh root@139.84.158.2 "docker exec nbm-be-postgres psql -U nbm_user -d nbm_be_production -c '\dt'"
 ```
 
-**Why This Happened:**
-When the frontend was deployed, it may have changed the default kamal-proxy configuration or created a new proxy instance. The proxy's default behavior is to strip path prefixes, which broke the backend routing that was working previously.
+## Troubleshooting
 
-**Key Takeaway:**
-Always explicitly set `--strip-path-prefix=false` when using path-based routing with kamal-proxy if your application expects to receive the full path.
-
----
-
-### Issue 2: Container Exited After Deployment
-
-**Symptoms:**
-
-- Container shows as "Exited" or stops immediately
-- Deployment fails at proxy registration step
-
-**Root Cause:**
-Kamal tries to register the container with kamal-proxy before it's fully healthy, causing a conflict.
-
-**Solution:**
-
-1. Stop and remove the failed container
-2. Start the container manually
-3. Register with proxy after container is healthy
+**Migrations not run:**
 
 ```bash
-# Stop and remove old containers
-ssh root@139.84.158.2 "docker stop <old-container> && docker rm <old-container>"
-
-# Start the new container
-ssh root@139.84.158.2 "docker start <new-container>"
-
-# Wait for health check to pass, then register proxy
-ssh root@139.84.158.2 "docker exec kamal-proxy kamal-proxy deploy nbm-be-web ..."
+kamal app exec "deno task migrate:run"
 ```
 
+**Need to rebuild image:**
+
+```bash
+git push origin main
+kamal deploy  # Rebuilds with latest code
+```
+
+That's it! Simple deployment with Kamal's defaults.
+
 ---
+
+## Architecture Overview
+
+### Simplified Path-Based Routing
+
+The deployment now uses a **clean, simple architecture** that works with Kamal's default proxy behavior:
+
+**How it works:**
+
+1. **Client requests**: `https://neverbeforemarketing.com/nbm-be/api/site-settings`
+2. **kamal-proxy receives**: `/nbm-be/api/site-settings`
+3. **kamal-proxy matches** path prefix: `/nbm-be/api` → route to nbm-be-web
+4. **kamal-proxy strips prefix** (default behavior): `/site-settings`
+5. **App receives**: `/site-settings` ✅
+6. **App routes match**: `GET /site-settings` registered in code ✅
+
+**Key Simplification:**
+
+- **App routes**: Registered at `/site-settings`, `/articles`, `/auth/*` (no prefix!)
+- **Public URLs**: `https://neverbeforemarketing.com/nbm-be/api/site-settings`
+- **Proxy behavior**: Strips `/nbm-be/api` prefix automatically (default)
+- **Result**: Clean routing with **zero manual configuration** needed!
+
+### Why This is Better
+
+**Before (Complex):**
+
+- ❌ App routes included `/nbm-be/api` prefix in code
+- ❌ Had to disable proxy's default stripping behavior
+- ❌ Required manual proxy registration with `--strip-path-prefix=false`
+- ❌ Complex post-deploy hooks to automate registration
+- ❌ Configuration hell for each deployment
+
+**After (Simple):**
+
+- ✅ App routes are clean: `/site-settings`, `/articles`
+- ✅ Uses proxy's default stripping behavior
+- ✅ Kamal handles proxy registration automatically
+- ✅ No manual commands or hooks needed
+- ✅ Works the same in development and production
+
+### Common Tasks
+
+**Run migrations:**
+
+```bash
+kamal app exec "deno task migrate:run"
+
+# Verify tables exist
+ssh root@139.84.158.2 "docker exec nbm-be-postgres psql -U nbm_user -d nbm_be_production -c '\dt'"
+```
+
+**Seed database:**
+
+```bash
+kamal app exec "deno task db:seed:site"
+```
+
+**Check container health:**
+
+```bash
+ssh root@139.84.158.2 "docker ps | grep nbm-be-web"
+curl https://neverbeforemarketing.com/nbm-be/api/health
+```
 
 ### Issue 3: Database Table Not Found
 
@@ -241,70 +215,65 @@ https://neverbeforemarketing.com/
 4. **Backend Container**: Receives full path `/nbm-be/api/site-settings`
 5. **Hono App**: Matches route registered at `/nbm-be/api/site-settings`
 
-### Route Registration in Code
+### Route Registration (Clean!)
 
 ```typescript
-// src/entities/index.ts
-app.route("/nbm-be/api", routeModule.default);
+// src/entities/index.ts - Auto-registered routes
+app.route("/", routeModule.default);  // ← No prefix!
 
-// src/main.ts
-app.route("/nbm-be/api", authRoutes);
-app.route("/nbm-be/api", adminRoutes);
-app.get("/health", healthCheck); // Root level health check
+// src/main.ts - Manual routes
+app.route("/", authRoutes);  // ← No prefix!
+app.route("/", adminRoutes);  // ← No prefix!
+app.get("/health", healthCheck);  // Root level health check
 ```
 
-**Important**: The `/health` endpoint is registered at root level (not under `/nbm-be/api`) because it's used by kamal-proxy for health checks.
+**Routes in app:**
 
----
+- `/site-settings`, `/articles`, `/auth/login`, `/admin/users`, etc.
 
-## Best Practices
+**Public URLs:**
 
-1. **Always specify `--strip-path-prefix=false`** when using path-based routing
-2. **Document proxy configuration** in deployment scripts
-3. **Keep health check at root level** (`/health` not `/nbm-be/api/health`)
-4. **Test routes after deployment** before declaring success
-5. **Check container logs** to see what paths the app is receiving
-6. **Use commit hashes for containers** rather than `:latest` tag for clarity
+- `https://neverbeforemarketing.com/nbm-be/api/site-settings`
+- `https://neverbeforemarketing.com/nbm-be/api/articles`
+- `https://neverbeforemarketing.com/nbm-be/api/auth/login`
+
+**Magic:** Proxy strips `/nbm-be/api` automatically! ✨
 
 ---
 
 ## Quick Reference
 
-### Get Container ID
+### Deployment
 
 ```bash
-ssh root@139.84.158.2 "docker ps | grep nbm-be-web"
+# Deploy to production
+kamal deploy
+
+# Run migrations
+kamal app exec "deno task migrate:run"
+
+# Seed database
+kamal app exec "deno task db:seed:site"
 ```
 
-### Check Proxy Status
+### Monitoring
 
 ```bash
-ssh root@139.84.158.2 "docker exec kamal-proxy kamal-proxy list"
+# Check container status
+ssh root@139.84.158.2 "docker ps | grep nbm-be"
+
+# View logs
+kamal app logs --since 10m
+
+# Test API
+curl https://neverbeforemarketing.com/nbm-be/api/health
+curl https://neverbeforemarketing.com/nbm-be/api/site-settings | jq '.'
 ```
 
-### View Container Logs
+### Best Practices
 
-```bash
-ssh root@139.84.158.2 "docker logs --tail 50 <container-id>"
-```
-
-### Restart Container
-
-```bash
-ssh root@139.84.158.2 "docker restart <container-id>"
-```
-
-### Remove and Re-register Proxy
-
-```bash
-ssh root@139.84.158.2 "docker exec kamal-proxy kamal-proxy remove nbm-be-web && \
-  docker exec kamal-proxy kamal-proxy deploy nbm-be-web \
-  --target=<container-id>:8000 \
-  --host=neverbeforemarketing.com \
-  --path-prefix=/nbm-be/api \
-  --strip-path-prefix=false \
-  --health-check-path=/health \
-  --health-check-interval=10s \
-  --health-check-timeout=120s \
-  --target-timeout=60s"
-```
+1. ✅ Keep routes clean (no prefixes in code)
+2. ✅ Let proxy handle path stripping (default behavior)
+3. ✅ Test endpoints after deployment
+4. ✅ Use `kamal app logs` for debugging
+5. ✅ Commit hashes help track deployments

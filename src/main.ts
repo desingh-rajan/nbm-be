@@ -52,8 +52,8 @@ app.get("/health", async (c: Context) => {
 });
 
 // Auth routes (manual registration)
-app.route("/nbm-be/api", authRoutes);
-app.route("/nbm-be/api", adminRoutes);
+app.route("/", authRoutes);
+app.route("/", adminRoutes);
 
 // API routes - Auto-registered from entities folder
 // All *.route.ts files in entities/* subdirectories are automatically imported
@@ -72,7 +72,7 @@ app.get("/", (c: Context) => {
       version: "1.0.0",
       description:
         "A lightweight, type-safe backend service built with Deno, Hono, Drizzle, and PostgreSQL",
-      documentation: "/nbm-be/api/docs",
+      documentation: "/docs",
       health: "/health",
       message:
         "Start building by scaffolding entities: tstack scaffold products",
@@ -102,7 +102,7 @@ async function startServer() {
       console.log("\n Available endpoints:");
       console.log("   GET  /       - API information");
       console.log("   GET  /health - Health check");
-      console.log("   All /nbm-be/api/*   - Auto-registered from entities/");
+      console.log("   All /*       - Auto-registered from entities/");
       console.log("\n Scaffold entities to get started:");
       console.log("   tstack scaffold articles");
       console.log("   tstack scaffold products");
