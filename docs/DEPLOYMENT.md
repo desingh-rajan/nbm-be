@@ -27,7 +27,7 @@ kamal app logs --since 10m
 
 **Simplified Architecture:**
 
-```
+```text
 Public URL:  https://neverbeforemarketing.com/nbm-be/api/site-settings
                ↓
 Proxy:       Strips /nbm-be/api prefix (default behavior)
@@ -56,30 +56,11 @@ curl https://neverbeforemarketing.com/nbm-be/api/site-settings
 ssh root@139.84.158.2 "docker exec nbm-be-postgres psql -U nbm_user -d nbm_be_production -c '\dt'"
 ```
 
-## Troubleshooting
-
-**Migrations not run:**
-
-```bash
-kamal app exec "deno task migrate:run"
-```
-
-**Need to rebuild image:**
-
-```bash
-git push origin main
-kamal deploy  # Rebuilds with latest code
-```
-
-That's it! Simple deployment with Kamal's defaults.
-
----
-
 ## Architecture Overview
 
 ### Simplified Path-Based Routing
 
-The deployment now uses a **clean, simple architecture** that works with Kamal's default proxy behavior:
+The deployment uses a **clean, simple architecture** that works with Kamal's default proxy behavior:
 
 **How it works:**
 
@@ -115,87 +96,9 @@ The deployment now uses a **clean, simple architecture** that works with Kamal's
 - ✅ No manual commands or hooks needed
 - ✅ Works the same in development and production
 
-### Common Tasks
-
-**Run migrations:**
-
-```bash
-kamal app exec "deno task migrate:run"
-
-# Verify tables exist
-ssh root@139.84.158.2 "docker exec nbm-be-postgres psql -U nbm_user -d nbm_be_production -c '\dt'"
-```
-
-**Seed database:**
-
-```bash
-kamal app exec "deno task db:seed:site"
-```
-
-**Check container health:**
-
-```bash
-ssh root@139.84.158.2 "docker ps | grep nbm-be-web"
-curl https://neverbeforemarketing.com/nbm-be/api/health
-```
-
-### Issue 3: Database Table Not Found
-
-**Symptoms:**
-
-- API returns error: `relation "site_settings" does not exist`
-- Seed script fails
-
-**Root Cause:**
-Migrations not run in production database.
-
-**Solution:**
-
-```bash
-# Run migrations
-kamal app exec "deno task migrate:run"
-
-# Verify table exists
-ssh root@139.84.158.2 "docker exec nbm-be-postgres psql -U nbm_user -d nbm_be_production -c '\dt'"
-```
-
----
-
-### Issue 4: Seed Script Not Found in Container
-
-**Symptoms:**
-
-- Error: `Module not found "file:///app/scripts/seed-site-settings.ts"`
-
-**Root Cause:**
-The Docker image was built before the seed script was committed to the repository.
-
-**Solution:**
-
-1. Commit and push the seed script
-2. Rebuild the Docker image (kamal deploy will build new image with latest code)
-3. Run the seed script
-
-```bash
-# Ensure latest code is pushed
-git add scripts/seed-site-settings.ts
-git commit -m "feat: Add site settings seed script"
-git push origin main
-
-# Deploy (will rebuild with latest code)
-kamal deploy
-
-# Run seed script
-ssh root@139.84.158.2 "docker exec <container> deno task db:seed:site"
-```
-
----
-
-## Path-Based Routing Architecture
-
 ### URL Structure
 
-```
+```text
 https://neverbeforemarketing.com/
 ├── /                          → Frontend (Next.js on port 3000)
 └── /nbm-be/api/*              → Backend API (Deno on port 8000)
@@ -204,16 +107,6 @@ https://neverbeforemarketing.com/
     ├── /admin/*               → Admin endpoints
     └── /site-settings/*       → Site configuration
 ```
-
-### How Proxy Routing Works
-
-1. **Client Request**: `https://neverbeforemarketing.com/nbm-be/api/site-settings`
-2. **Nginx/TLS Termination**: Handles HTTPS and SSL certificates
-3. **kamal-proxy**: Routes based on path prefix
-   - Matches `/nbm-be/api` prefix
-   - Forwards to backend container with `--strip-path-prefix=false`
-4. **Backend Container**: Receives full path `/nbm-be/api/site-settings`
-5. **Hono App**: Matches route registered at `/nbm-be/api/site-settings`
 
 ### Route Registration (Clean!)
 
@@ -241,7 +134,142 @@ app.get("/health", healthCheck);  // Root level health check
 
 ---
 
-## Quick Reference
+## First Time Setup
+
+### Prerequisites
+
+- Kamal installed (`gem install kamal`)
+- Docker Hub account with repository: `desinghrajan/nbm-be`
+- VPS access: 139.84.158.2
+- Frontend already deployed with kamal-proxy on same server
+
+### 1. Configure Secrets
+
+Edit `.kamal/secrets` and fill in the values:
+
+```bash
+# Docker Hub credentials
+export KAMAL_REGISTRY_PASSWORD="your-docker-hub-token"
+
+# Database credentials (generate secure passwords)
+export POSTGRES_PASSWORD="your-postgres-password"
+export DATABASE_PASSWORD="your-postgres-password"  # Should match POSTGRES_PASSWORD
+
+# JWT Secret (generate with: openssl rand -hex 32)
+export JWT_SECRET="your-jwt-secret-key"
+```
+
+### 2. Source the secrets file
+
+```bash
+source .kamal/secrets
+```
+
+### 3. Setup Steps
+
+1. **Initialize Kamal** (if not done):
+
+   ```bash
+   kamal init
+   ```
+
+2. **Setup the server** (installs Docker, creates network):
+
+   ```bash
+   kamal server bootstrap
+   ```
+
+3. **Setup PostgreSQL accessory**:
+
+   ```bash
+   kamal accessory boot postgres
+   ```
+
+   Wait for PostgreSQL to be ready:
+
+   ```bash
+   kamal accessory logs postgres
+   ```
+
+4. **Deploy the application**:
+
+   ```bash
+   kamal deploy
+   ```
+
+5. **Run database migrations**:
+
+   ```bash
+   kamal app exec "deno task migrate:run"
+   ```
+
+6. **Seed the superadmin user** (only once):
+
+   ```bash
+   kamal app exec "deno task db:seed:superadmin"
+   ```
+
+---
+
+## Troubleshooting
+
+### Migrations not run
+
+```bash
+kamal app exec "deno task migrate:run"
+```
+
+### Need to rebuild image
+
+```bash
+git push origin main
+kamal deploy  # Rebuilds with latest code
+```
+
+### Database Table Not Found
+
+**Symptoms:**
+
+- API returns error: `relation "site_settings" does not exist`
+- Seed script fails
+
+**Solution:**
+
+```bash
+# Run migrations
+kamal app exec "deno task migrate:run"
+
+# Verify table exists
+ssh root@139.84.158.2 "docker exec nbm-be-postgres psql -U nbm_user -d nbm_be_production -c '\dt'"
+```
+
+### Check container health
+
+```bash
+ssh root@139.84.158.2 "docker ps | grep nbm-be-web"
+curl https://neverbeforemarketing.com/nbm-be/api/health
+```
+
+### Check kamal-proxy routing
+
+```bash
+ssh root@139.84.158.2 "docker exec kamal-proxy kamal-proxy list"
+```
+
+### View logs
+
+```bash
+# Application logs
+kamal app logs --since 10m
+kamal app logs --follow
+
+# Database logs
+kamal accessory logs postgres
+```
+
+---
+
+## Useful Commands
 
 ### Deployment
 
@@ -262,6 +290,9 @@ kamal app exec "deno task db:seed:site"
 # Check container status
 ssh root@139.84.158.2 "docker ps | grep nbm-be"
 
+# Check all services
+kamal app status
+
 # View logs
 kamal app logs --since 10m
 
@@ -270,10 +301,85 @@ curl https://neverbeforemarketing.com/nbm-be/api/health
 curl https://neverbeforemarketing.com/nbm-be/api/site-settings | jq '.'
 ```
 
-### Best Practices
+### Database Operations
+
+```bash
+# Connect to PostgreSQL
+kamal accessory exec postgres psql -U nbm_user -d nbm_be_production
+
+# Backup database
+kamal accessory exec postgres pg_dump -U nbm_user nbm_be_production > backup.sql
+
+# Verify tables
+ssh root@139.84.158.2 "docker exec nbm-be-postgres psql -U nbm_user -d nbm_be_production -c '\dt'"
+```
+
+### Other
+
+```bash
+# Restart application
+kamal app restart
+
+# View environment variables
+kamal app exec env
+
+# Rollback to previous version
+kamal rollback
+```
+
+---
+
+## Configuration Reference
+
+### Database Connection
+
+The application connects to PostgreSQL using:
+
+- **Host**: `nbm-be-postgres` (Docker network internal DNS)
+- **Port**: `5432`
+- **Database**: `nbm_be_production`
+- **User**: `nbm_user`
+- **Password**: From `POSTGRES_PASSWORD` secret
+
+### Environment Variables
+
+**Clear (not secret):**
+
+- `PORT=8000`
+- `NODE_ENV=production`
+- `ENVIRONMENT=production`
+- `DATABASE_HOST=nbm-be-postgres`
+- `DATABASE_PORT=5432`
+- `DATABASE_NAME=nbm_be_production`
+- `DATABASE_USER=nbm_user`
+
+**Secret:**
+
+- `DATABASE_PASSWORD` - PostgreSQL password
+- `JWT_SECRET` - JWT signing key
+
+### Kamal Proxy Configuration
+
+The deployment uses kamal-proxy (shared with frontend) for path-based routing:
+
+- **Configuration**: `path_prefix: /nbm-be/api` in `config/deploy.yml`
+- **Routing**: Requests to `/nbm-be/api/*` are routed to backend container
+- **Path Stripping**: Proxy automatically strips `/nbm-be/api` prefix (default behavior)
+- **App Routes**: Registered cleanly without prefix: `/site-settings`, `/articles`, `/auth/*`
+- **SSL**: Uses existing SSL certificate from frontend deployment
+- **Domain**: Shares `neverbeforemarketing.com` with frontend
+
+---
+
+## Best Practices
 
 1. ✅ Keep routes clean (no prefixes in code)
 2. ✅ Let proxy handle path stripping (default behavior)
 3. ✅ Test endpoints after deployment
 4. ✅ Use `kamal app logs` for debugging
 5. ✅ Commit hashes help track deployments
+6. ✅ Never commit `.kamal/secrets` to git
+7. ✅ Use strong passwords for PostgreSQL
+8. ✅ Consider setting up PostgreSQL backups
+
+That's it! Simple deployment with Kamal's defaults.

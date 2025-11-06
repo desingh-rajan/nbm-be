@@ -5,7 +5,7 @@
 - Kamal installed (`gem install kamal`)
 - Docker Hub account with repository: `desinghrajan/nbm-be`
 - VPS access: 139.84.158.2
-- Frontend already deployed with Traefik proxy
+- Frontend already deployed with kamal-proxy on same server
 
 ## Environment Setup
 
@@ -154,24 +154,33 @@ docker logs nbm-fe-traefik  # Assuming frontend named traefik container
 kamal rollback
 ```
 
-## API Endpoint
+## API Endpoints
 
 After successful deployment, your API will be available at:
 
 - **Base URL**: `https://neverbeforemarketing.com/nbm-be/api`
 - **Health Check**: `https://neverbeforemarketing.com/nbm-be/api/health`
 - **Login**: `https://neverbeforemarketing.com/nbm-be/api/auth/login`
+- **Site Settings**: `https://neverbeforemarketing.com/nbm-be/api/site-settings`
 - **Articles**: `https://neverbeforemarketing.com/nbm-be/api/articles`
-- **Admin Articles**: `https://neverbeforemarketing.com/nbm-be/api/admin/articles`
 
-## Traefik Configuration
+## Kamal Proxy Configuration
 
-The deployment is configured to work with your existing Traefik instance from the frontend deployment:
+The deployment uses kamal-proxy (shared with frontend) for path-based routing:
 
-- Routes requests from `/nbm-be/api` to the backend container
-- Strips `/nbm-be/api` prefix before forwarding (so `/nbm-be/api/health` becomes `/health`)
-- Uses existing SSL certificate from Let's Encrypt
-- Shares the same domain: `neverbeforemarketing.com`
+- **Configuration**: `path_prefix: /nbm-be/api` in `config/deploy.yml`
+- **Routing**: Requests to `/nbm-be/api/*` are routed to backend container
+- **Path Stripping**: Proxy automatically strips `/nbm-be/api` prefix (default behavior)
+- **App Routes**: Registered cleanly without prefix: `/site-settings`, `/articles`, `/auth/*`
+- **SSL**: Uses existing SSL certificate from frontend deployment
+- **Domain**: Shares `neverbeforemarketing.com` with frontend
+
+**Example Request Flow:**
+
+1. Client: `GET https://neverbeforemarketing.com/nbm-be/api/site-settings`
+2. Proxy receives: `/nbm-be/api/site-settings`
+3. Proxy strips prefix: `/site-settings`
+4. App receives: `/site-settings` ✅
 
 ## Database Connection
 
