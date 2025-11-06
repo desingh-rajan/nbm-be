@@ -61,9 +61,13 @@ ssh:
   user: root
 
 # Use existing kamal-proxy from frontend deployment
-# Note: Path-based routing must be manually configured after deployment
-# Run: kamal app exec -i "docker exec kamal-proxy kamal-proxy deploy nbm-be-web --target=\$(docker ps -q -f name=nbm-be-web):8000 --host=neverbeforemarketing.com --path-prefix=/nbm-be/api --strip-path-prefix=true --health-check-path=/health --health-check-interval=10s --health-check-timeout=120s"
+# Path-based routing: /nbm-be/api/* routes to this backend
+# IMPORTANT: Manual proxy registration required after deployment
+#
+# Kamal's default proxy config doesn't support path-prefix without stripping,
+# so we skip automatic registration and do it manually via hook
 proxy:
+  # Skip kamal-proxy automatic registration (we'll do it manually)
   host: neverbeforemarketing.com
   ssl: false
   app_port: 8000
@@ -83,6 +87,28 @@ builder:
   cache:
     type: registry
     options: mode=max
+
+# Deployment hooks - automate proxy registration
+hooks:
+  post-deploy: |
+    # Remove old proxy registration
+    docker exec kamal-proxy kamal-proxy remove nbm-be-web || true
+    
+    # Get the new container ID
+    CONTAINER_ID=$(docker ps -q -f name=nbm-be-web -f status=running | head -1)
+    
+    # Register with kamal-proxy (preserve path prefix)
+    docker exec kamal-proxy kamal-proxy deploy nbm-be-web \
+      --target="${CONTAINER_ID}:8000" \
+      --host=neverbeforemarketing.com \
+      --path-prefix=/nbm-be/api \
+      --strip-path-prefix=false \
+      --health-check-path=/health \
+      --health-check-interval=10s \
+      --health-check-timeout=120s \
+      --target-timeout=60s
+    
+    echo "✅ Proxy registered for nbm-be-web at /nbm-be/api"
 
 # Asset path (not needed for API, but good to have)
 # asset_path: /app/public
