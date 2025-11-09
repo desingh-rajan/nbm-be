@@ -5,11 +5,11 @@ export const CreateAdminSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").max(50),
   password: z.string().min(8, "Password must be at least 8 characters"),
   role: z
-    .enum(["admin", "moderator"])
+    .enum(["user", "admin", "moderator"])
     .optional()
-    .default("admin")
+    .default("user")
     .describe(
-      "Role for the user (admin or moderator). Cannot create superadmin.",
+      "Role for the user (user, admin, or moderator). Defaults to user.",
     ),
 });
 
@@ -20,8 +20,8 @@ export const UpdateUserSchema = z.object({
 });
 
 export const GetUsersQuerySchema = z.object({
-  page: z.coerce.number().default(1),
-  limit: z.coerce.number().default(20),
+  page: z.coerce.number().min(1, "Page must be >= 1").default(1),
+  limit: z.coerce.number().min(1, "Limit must be >= 1").max(100, "Limit must be <= 100").default(20),
 });
 
 export type CreateAdminDTO = z.infer<typeof CreateAdminSchema>;

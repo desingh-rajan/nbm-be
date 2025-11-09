@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../config/database.ts";
 import { type SafeUser, users } from "./user.model.ts";
 import { hashPassword } from "../shared/utils/password.ts";
@@ -10,21 +10,21 @@ import {
 
 export class AdminService {
   /**
-   * Create a new admin user (only superadmin can do this)
+   * Create a new user (only superadmin can do this)
    */
   static async createAdmin(
     data: {
       email: string;
       password: string;
       username: string;
-      role?: "admin" | "moderator";
+      role?: "user" | "admin" | "moderator";
     },
     requestingUser: { role: string },
   ): Promise<SafeUser> {
-    // Only superadmin can create admins/moderators
+    // Only superadmin can create users
     if (requestingUser.role !== "superadmin") {
       throw new ForbiddenError(
-        "Only superadmin can create admin or moderator users",
+        "Only superadmin can create users",
       );
     }
 
@@ -42,45 +42,60 @@ export class AdminService {
     // Hash password
     const hashedPassword = await hashPassword(data.password);
 
-    // Create admin user (default to "admin" role)
-    const [newAdmin] = await db
+    // Create user (default to "user" role)
+    const [newUser] = await db
       .insert(users)
       .values({
         email: data.email,
         username: data.username,
         password: hashedPassword,
-        role: data.role || "admin", // Can be admin or moderator, NOT superadmin
+        role: data.role || "user", // Default to user role
         isActive: true,
-        isEmailVerified: true, // Admins are verified by default
+        isEmailVerified: true, // Users created by admin are verified by default
       })
       .returning();
 
-    // Return admin without password
-    const { password: _, ...safeAdmin } = newAdmin;
-    return safeAdmin;
+    // Return user without password
+    const { password: _, ...safeUser } = newUser;
+    return safeUser;
   }
 
   /**
    * Get all users (paginated)
+   * @param page - Page number (1-indexed, default 1)
+   * @param limit - Items per page (1-100, default 20)
    */
-  static async getAllUsers(page = 1, limit = 20): Promise<{
+  static async getAllUsers(
+    page?: string | number,
+    limit?: string | number,
+  ): Promise<{
     users: SafeUser[];
     total: number;
     page: number;
+    limit: number;
     totalPages: number;
   }> {
-    const offset = (page - 1) * limit;
+    // Validate and coerce page and limit
+    const pageNum = Math.max(1, Number(page ?? 1));
+    const limitNum = Math.min(100, Math.max(1, Number(limit ?? 20)));
+
+    const offset = (pageNum - 1) * limitNum;
 
     // Get users
     const userList = await db
       .select()
       .from(users)
-      .limit(limit)
+      .limit(limitNum)
       .offset(offset);
 
-    // Get total count
-    const totalResult = await db.select().from(users);
-    const total = totalResult.length;
+    // Get total count (use COUNT aggregate to avoid fetching all rows)
+    const totalResult = await db
+      .select({ count: sql`count(${users.id})` })
+      .from(users);
+
+    // totalResult[0].count may be returned as string depending on driver; coerce to number
+    const firstRow = (totalResult[0] as unknown) as { count?: string | number };
+    const total = Number(firstRow.count ?? 0);
 
     // Remove passwords
     const safeUsers = userList.map(({ password: _, ...user }) => user);
@@ -88,8 +103,9 @@ export class AdminService {
     return {
       users: safeUsers,
       total,
-      page,
-      totalPages: Math.ceil(total / limit),
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
     };
   }
 

@@ -2,7 +2,6 @@ import { Context } from "hono";
 import { AdminService } from "./admin.service.ts";
 import {
   CreateAdminSchema,
-  GetUsersQuerySchema,
   UpdateUserSchema,
 } from "./admin.dto.ts";
 import { ValidationUtil } from "../shared/utils/validation.ts";
@@ -31,18 +30,14 @@ export class AdminController {
    * GET /admin/users?page=1&limit=20
    */
   static async getAllUsers(c: Context) {
-    const query = {
-      page: c.req.query("page"),
-      limit: c.req.query("limit"),
-    };
-    const { page, limit } = ValidationUtil.validate(
-      GetUsersQuerySchema,
-      query,
-    );
+    const page = c.req.query("page");
+    const limit = c.req.query("limit");
 
     const result = await AdminService.getAllUsers(page, limit);
 
-    return c.json(ApiResponse.success(result, "Users retrieved successfully"));
+    return c.json(
+      ApiResponse.paginated(result.users, result.page, result.limit, result.total, "Users retrieved successfully"),
+    );
   }
 
   /**
