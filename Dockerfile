@@ -15,12 +15,18 @@ COPY . .
 # Cache the main application
 RUN deno cache src/main.ts
 
+# Pre-cache migration dependencies so entrypoint is fast
+RUN deno cache scripts/migrate-run.ts
+
+# Ensure entrypoint is executable
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Expose port
 EXPOSE 8000
 
-# Add healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+# Add healthcheck with longer start-period for cold start + migration time
+HEALTHCHECK --interval=10s --timeout=5s --start-period=90s --retries=5 \
   CMD deno eval --allow-net "try { const res = await fetch('http://localhost:8000/health'); Deno.exit(res.ok ? 0 : 1); } catch { Deno.exit(1); }"
 
-# Run the application
-CMD ["deno", "run", "--allow-all", "src/main.ts"]
+# Entrypoint runs migrations then starts the app
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

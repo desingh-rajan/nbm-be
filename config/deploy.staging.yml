@@ -1,0 +1,91 @@
+# Kamal Configuration for NBM Backend API - STAGING
+service: nbm-be
+image: desinghrajan/nbm-be
+
+# Primary domain (same as frontend)
+primary_role: web
+
+# Docker registry authentication
+registry:
+  username: desinghrajan
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+# Servers to deploy to
+servers:
+  web:
+    hosts:
+      - 13.126.26.123
+    options:
+      network-alias: nbm-be-internal
+      memory: 300m
+      memory-swap: 400m
+
+# PostgreSQL database accessory
+# NOTE: this box also runs sc-api's staging Postgres on host port 5432 -
+# remap to 5433 on the host to avoid a port clash.
+accessories:
+  postgres:
+    image: postgres:16-alpine
+    host: 13.126.26.123
+    port: "5433:5432"
+    env:
+      clear:
+        POSTGRES_USER: nbm_user
+        POSTGRES_DB: nbm_be_staging
+      secret:
+        - POSTGRES_PASSWORD
+    directories:
+      - data:/var/lib/postgresql/data
+    options:
+      health-cmd: "pg_isready -U nbm_user -d nbm_be_staging"
+      health-interval: 10s
+      health-timeout: 5s
+      health-retries: 5
+
+# Environment variables for the application
+env:
+  clear:
+    PORT: 8000
+    NODE_ENV: staging
+    ENVIRONMENT: staging
+    JWT_ISSUER: tonystack-staging
+    JWT_EXPIRY: 7d
+    ALLOWED_ORIGINS: https://nbm.desinghrajan.in
+    LOG_LEVEL: debug
+    SUPERADMIN_EMAIL: admin@nbm.com
+    ALPHA_EMAIL: alpha@nbm.com
+    ALPHA_USERNAME: Alpha User
+  secret:
+    - DATABASE_URL
+    - JWT_SECRET
+    - SUPERADMIN_PASSWORD
+    - ALPHA_PASSWORD
+
+# SSH configuration
+ssh:
+  user: ubuntu
+
+# Proxy configuration for path-based routing
+# Routes /nbm-be/api/* to this service (strips prefix by default)
+proxy:
+  host: nbm.desinghrajan.in
+  path_prefix: /nbm-be/api
+  ssl: false
+  app_port: 8000
+  forward_headers: true
+  response_timeout: 60
+  healthcheck:
+    path: /health
+    interval: 10
+    timeout: 120
+  buffering:
+    requests: true
+    responses: true
+
+# Build configuration
+builder:
+  arch: amd64
+  cache:
+    type: registry
+    options: mode=max
