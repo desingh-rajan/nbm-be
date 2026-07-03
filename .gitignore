@@ -36,7 +36,7 @@ build/
 
 # Kamal
 .kamal/secrets
-.kamal/secrets-*
+.kamal/secrets.*
 
 # Production notes (contains credentials)
 PRODUCTION_SETUP.md
