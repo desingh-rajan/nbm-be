@@ -26,7 +26,7 @@ EXPOSE 8000
 
 # Add healthcheck with longer start-period for cold start + migration time
 HEALTHCHECK --interval=10s --timeout=5s --start-period=90s --retries=5 \
-  CMD deno eval --allow-net "try { const res = await fetch('http://localhost:8000/health'); Deno.exit(res.ok ? 0 : 1); } catch { Deno.exit(1); }"
+  CMD deno eval "try { const res = await fetch('http://localhost:8000/health'); Deno.exit(res.ok ? 0 : 1); } catch { Deno.exit(1); }"
 
 # Entrypoint runs migrations then starts the app
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
